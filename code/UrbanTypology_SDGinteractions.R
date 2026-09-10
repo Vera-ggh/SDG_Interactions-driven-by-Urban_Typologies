@@ -6,14 +6,13 @@ library(DMwR2); library(Metrics); library(ggplot2); library(NbClust); library(co
 library(here)
 
 # Project directories
+# Project directories
 project_dir <- here()
-analysis_dir <- here("data", "Final_Data_082025")
-park_dir <- here("data", "ParkServe_fgd_DataShare_05212025")
+analysis_dir <- here("data", "Original_data")
+park_dir <- here("data", "ParkServe_fgd_DataShare")
 result_dir <- here("results")
 
 if (!dir.exists(result_dir)) dir.create(result_dir, recursive = TRUE)
-
-
 
 #==========================================================================================================
 #-------------------------------------- Data prepossessing ------------------------------------------------
@@ -76,7 +75,7 @@ saveWorkbook(wb, output_file, overwrite = TRUE)
 # Sensitivity analysis added to determine optimal k
 
 # 1. File paths
-input_path <- file.path(analysis_dir, "1_raw data_54indi_unsigned.xlsx")
+input_path <- file.path(analysis_dir, "1_raw data_55indi_unsigned.xlsx")
 
 # 2. Read data
 df <- read_excel(input_path); city_names <- df$city
@@ -133,7 +132,7 @@ final_k <- 10; df_imputed <- knnImputation(as.data.frame(df_indicators), k = fin
 df_final <- data.frame(city = city_names, df_imputed, check.names = FALSE)
 
 # 10. Save final imputed dataset and highlight imputed values
-output_file <- file.path(analysis_dir, paste0("raw_data_54indi_KNN_imputed_k", final_k, ".xlsx"))
+output_file <- file.path(analysis_dir, paste0("raw_data_55indi_KNN_imputed_k", final_k, ".xlsx"))
 wb <- createWorkbook(); addWorksheet(wb, "KNN_imputed"); writeData(wb, "KNN_imputed", df_final); imputed_style <- createStyle(fontColour = "#FF0000")
 for (j in seq_len(ncol(original_missing))) { missing_rows <- which(original_missing[, j]); if (length(missing_rows) > 0) addStyle(wb, "KNN_imputed", imputed_style, rows = missing_rows + 1, cols = j + 1, gridExpand = TRUE, stack = TRUE) }
 freezePane(wb, "KNN_imputed", firstActiveRow = 2, firstActiveCol = 2); setColWidths(wb, "KNN_imputed", 1:ncol(df_final), widths = "auto"); saveWorkbook(wb, output_file, overwrite = TRUE)
@@ -198,8 +197,8 @@ ggsave(file.path(output_dir, "radar_plot_nation.png"), plot = p_nation, width = 
 #===============================================================================
 #--------Apply effect directions to generate signed SDG indicators--------------
 #===============================================================================
-direction_file <- file.path(output_dir, "3_Effects directions of 54 indicators.xlsx")
-imputed_file <- file.path(output_dir, "raw_data_54indi_KNN_imputed_k10.xlsx")
+direction_file <- file.path(output_dir, "3_Effects directions of 55 indicators.xlsx")
+imputed_file <- file.path(output_dir, "raw_data_55indi_KNN_imputed_k10.xlsx")
 
 df_imputed <- read_excel(imputed_file)
 direction_df <- read_excel(direction_file) %>% mutate(Indicators = as.character(Indicators), Directions = as.numeric(Directions))
@@ -211,7 +210,7 @@ if (length(missing_direction) > 0) stop("Missing effect directions for: ", paste
 
 df_signed <- df_imputed %>% mutate(across(all_of(indicator_cols), ~ .x * directions[cur_column()]))
 
-write_xlsx(df_signed, file.path(output_dir, "Indicator_54_signed_imputed.xlsx"))
+write_xlsx(df_signed, file.path(output_dir, "Indicator_55_signed_imputed.xlsx"))
 
 cat("Signed indicators saved successfully.\n")
 cat("Indicators multiplied by -1:", sum(direction_df$Directions == -1), "\n")
@@ -220,7 +219,7 @@ cat("Indicators multiplied by 1:", sum(direction_df$Directions == 1), "\n")
 #===========================================================================================
 #--------K-means clustering analysis and Centro values of indicators in each typology--------
 #===========================================================================================
-file_path <- file.path(analysis_dir, "Indicator_54_signed_imputed.xlsx"); data_cluster <- read_excel(file_path, sheet = "Sheet1")
+file_path <- file.path(analysis_dir, "Indicator_55_signed_imputed.xlsx"); data_cluster <- read_excel(file_path, sheet = "Sheet1")
 data_normalized <- scale(data_cluster[, -1])
 
 set.seed(123)
@@ -235,7 +234,7 @@ centroids <- as.data.frame(kmeans_result$centers); centroids$Typology <- paste0(
 write_xlsx(centroids, file.path(analysis_dir, "Indicator_centroids.xlsx"))
 
 city_clusters <- data.frame(City = data_cluster[[1]], Typology = kmeans_result$cluster); write_xlsx(city_clusters, file.path(analysis_dir, "Cities_by_typology.xlsx"))
-clustered_file <- file.path(output_dir, "Indicator_54_signed_imputed_with_typology.xlsx")
+clustered_file <- file.path(output_dir, "Indicator_55_signed_imputed_with_typology.xlsx")
 write_xlsx(data_cluster, clustered_file)
 
 
@@ -244,7 +243,7 @@ write_xlsx(data_cluster, clustered_file)
 #----------Spearman analysis at indicator level for overall level and typology levels----------
 #=============================================================================================
 # Read one dataset containing city, 54 indicators, and Typology
-clustered_file <- file.path(analysis_dir, "Indicator_54_signed_imputed_with_typology.xlsx")
+clustered_file <- file.path(analysis_dir, "Indicator_55_signed_imputed_with_typology.xlsx")
 data_all <- read_excel(clustered_file)
 
 level_data <- list(
