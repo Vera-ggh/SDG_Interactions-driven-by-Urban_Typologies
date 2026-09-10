@@ -6,7 +6,6 @@ library(DMwR2); library(Metrics); library(ggplot2); library(NbClust); library(co
 library(here)
 
 # Project directories
-# Project directories
 project_dir <- here()
 analysis_dir <- here("data", "Original_data")
 park_dir <- here("data", "ParkServe_fgd_DataShare")
