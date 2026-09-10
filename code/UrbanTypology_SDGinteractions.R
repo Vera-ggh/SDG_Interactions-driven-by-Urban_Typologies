@@ -3,12 +3,17 @@ rm(list = ls())
 # Packages used across the script
 library(readxl); library(dplyr); library(tidyr); library(tibble); library(writexl); library(openxlsx)
 library(DMwR2); library(Metrics); library(ggplot2); library(NbClust); library(corrplot); library(Hmisc); library(igraph); library(grid)
+library(here)
 
-# Change only this path if your Windows user folder is different (e.g., genhong.gao instead of genho)
-project_dir <- "C:/Users/genho/OneDrive - University of Florida/Documents/PhD/PhD Programs/SDG/2_cities SDGs 082024"
-analysis_dir <- file.path(project_dir, "Statistical Analysis", "Final_Data_082025")
-park_dir <- file.path(project_dir, "ParkServe_fgd_DataShare_05212025")
-result_dir <- file.path(analysis_dir, "Result"); if (!dir.exists(result_dir)) dir.create(result_dir, recursive = TRUE)
+# Project directories
+project_dir <- here()
+analysis_dir <- here("data", "Final_Data_082025")
+park_dir <- here("data", "ParkServe_fgd_DataShare_05212025")
+result_dir <- here("results")
+
+if (!dir.exists(result_dir)) dir.create(result_dir, recursive = TRUE)
+
+
 
 #==========================================================================================================
 #-------------------------------------- Data prepossessing ------------------------------------------------
