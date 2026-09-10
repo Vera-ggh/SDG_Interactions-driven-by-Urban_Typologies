@@ -1,7 +1,7 @@
 rm(list = ls())
 
 # Packages used across the script
-library(readxl); library(dplyr); library(tidyr); library(tibble); library(writexl); library(openxlsx)
+library(readxl); library(dplyr); library(tidyr); library(tibble); library(writexl); library(openxlsx); library(circlize)
 library(DMwR2); library(Metrics); library(ggplot2); library(NbClust); library(corrplot); library(Hmisc); library(igraph); library(grid)
 library(here)
 
@@ -348,6 +348,45 @@ for (lvl in names(spearman_results)) {
   network_results[[lvl]] <- Intensity_results
   write_xlsx(Intensity_results, file.path(analysis_dir, paste0("Intensity_results", ifelse(lvl == "overall", "", sub("typology", "", lvl)), ".xlsx")))
 }
+
+#----------------Chord diagrams of SDG interaction intensity---------------------
+sankey_dir <- file.path(analysis_dir, "NetworkScore_Sankey")
+if (!dir.exists(sankey_dir)) dir.create(sankey_dir, recursive = TRUE)
+
+sdg_order <- c(paste0("SDG", 1:13), "SDG15", "SDG16")
+sdg_colors <- c("#E5243B", "#DDA63A", "#4C9F38", "#C5192D", "#FF3A21",
+                "#26BDE2", "#FCC30B", "#A21942", "#FD6925", "#DD1367",
+                "#FD9D24", "#BF8B2E", "#3F7E44", "#56C02B", "#00689D")
+names(sdg_colors) <- sdg_order
+
+plot_chord <- function(dat, intensity, panel_label) {
+  df_plot <- dat %>% filter(.data[[intensity]] > 0) %>%
+    transmute(Object1 = as.character(Object1), Object2 = as.character(Object2),
+              Intensity = .data[[intensity]])
+  
+  plot_order <- sdg_order[sdg_order %in% unique(c(df_plot$Object1, df_plot$Object2))]
+  circos.clear()
+  chordDiagram(df_plot, grid.col = sdg_colors, order = plot_order, transparency = 0.5)
+  mtext(panel_label, side = 3, adj = 0, line = -1, cex = 1.4, font = 2)
+}
+
+out_file <- file.path(sankey_dir, "ChordDiagram_All_Typologies.png")
+png(out_file, width = 8000, height = 4000, res = 600)
+par(mfrow = c(2, 4), mar = c(1, 1, 1.8, 1))
+
+plot_chord(network_results$overall,   "Intensity_Synergy",  "a.")
+plot_chord(network_results$typology1, "Intensity_Synergy",  "b.")
+plot_chord(network_results$typology2, "Intensity_Synergy",  "c.")
+plot_chord(network_results$typology3, "Intensity_Synergy",  "d.")
+
+plot_chord(network_results$overall,   "Intensity_Tradeoff", "e.")
+plot_chord(network_results$typology1, "Intensity_Tradeoff", "f.")
+plot_chord(network_results$typology2, "Intensity_Tradeoff", "g.")
+plot_chord(network_results$typology3, "Intensity_Tradeoff", "h.")
+
+dev.off()
+circos.clear()
+
 
 # --- Combine dominance scores from three typologies ---
 dom_list <- lapply(1:3, function(i) network_results[[paste0("typology", i)]] %>% transmute(Object1, Object2, !!paste0("dominance", i) := Intensity_Synergy - Intensity_Tradeoff))
