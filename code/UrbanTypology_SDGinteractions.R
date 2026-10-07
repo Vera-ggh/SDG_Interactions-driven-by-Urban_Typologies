@@ -71,24 +71,17 @@ saveWorkbook(wb, output_file, overwrite = TRUE)
 
 #-------------------------------------------------------------------------------
 #--------Impute SDG indicators with missing data by using KNN imputation--------
-# Sensitivity analysis added to determine optimal k
-
-# 1. File paths
 input_path <- file.path(analysis_dir, "1_raw data_55indi_unsigned.xlsx")
 
-# 2. Read data
 df <- read_excel(input_path); city_names <- df$city
 df_indicators <- df %>% dplyr::select(-city) %>% mutate(across(everything(), as.numeric)); original_missing <- is.na(df_indicators)
 cat("Total cities:", nrow(df_indicators), "| Indicators:", ncol(df_indicators), "| Missing values:", sum(original_missing),
     "| Missing rate:", round(mean(original_missing) * 100, 2), "%\n")
 
-# 3. Complete cases for KNN sensitivity analysis
 df_complete <- as.data.frame(df_indicators[complete.cases(df_indicators), ]); cat("Complete rows for validation:", nrow(df_complete), "\n")
 
-# 4. Sensitivity analysis settings
 set.seed(42); k_values <- c(3, 5, 7, 10, 15); n_rep <- 100; test_fraction <- 0.20; mask_rate <- 0.10; results <- data.frame()
 
-# 5. Repeated train-test masking validation
 for (rep in seq_len(n_rep)) {
   test_id <- sample(seq_len(nrow(df_complete)), round(test_fraction * nrow(df_complete)))
   train <- df_complete[-test_id, , drop = FALSE]; test <- df_complete[test_id, , drop = FALSE]
@@ -107,15 +100,12 @@ for (rep in seq_len(n_rep)) {
   if (rep %% 10 == 0) cat("Completed repetition", rep, "of", n_rep, "\n")
 }
 
-# 6. Summarize sensitivity results
 summary_results <- results %>% group_by(k) %>% summarise(Mean_RMSE = mean(RMSE), SD_RMSE = sd(RMSE), Mean_MAE = mean(MAE), SD_MAE = sd(MAE), .groups = "drop")
 print(summary_results %>% mutate(across(where(is.numeric), ~round(.x, 5))))
 
-# 7. Select optimal k
 best_k_rmse <- summary_results$k[which.min(summary_results$Mean_RMSE)]; best_rmse <- min(summary_results$Mean_RMSE)
 cat("Lowest mean RMSE at k =", best_k_rmse, "\n")
 
-# 8. Plot sensitivity analysis
 p_knn <- ggplot(summary_results, aes(k, Mean_RMSE)) + geom_line(color = "#4A90D9", linewidth = 1) + geom_point(color = "#4A90D9", size = 3) +
   geom_errorbar(aes(ymin = Mean_RMSE - SD_RMSE, ymax = Mean_RMSE + SD_RMSE), width = 0.5, color = "#4A90D9") +
   geom_point(data = filter(summary_results, k == best_k_rmse), color = "#D93F49", size = 4) +
@@ -126,11 +116,9 @@ print(p_knn); ggsave(file.path(analysis_dir, "KNN_sensitivity_analysis.png"), p_
 write.csv(summary_results, file.path(analysis_dir, "KNN_sensitivity_results.csv"), row.names = FALSE)
 write.csv(results, file.path(analysis_dir, "KNN_sensitivity_all_repetitions.csv"), row.names = FALSE)
 
-# 9. Final KNN imputation using optimal k
 final_k <- 10; df_imputed <- knnImputation(as.data.frame(df_indicators), k = final_k, scale = TRUE)
 df_final <- data.frame(city = city_names, df_imputed, check.names = FALSE)
 
-# 10. Save final imputed dataset and highlight imputed values
 output_file <- file.path(analysis_dir, paste0("raw_data_55indi_KNN_imputed_k", final_k, ".xlsx"))
 wb <- createWorkbook(); addWorksheet(wb, "KNN_imputed"); writeData(wb, "KNN_imputed", df_final); imputed_style <- createStyle(fontColour = "#FF0000")
 for (j in seq_len(ncol(original_missing))) { missing_rows <- which(original_missing[, j]); if (length(missing_rows) > 0) addStyle(wb, "KNN_imputed", imputed_style, rows = missing_rows + 1, cols = j + 1, gridExpand = TRUE, stack = TRUE) }
@@ -144,11 +132,9 @@ df <- read_excel(raw_path); ref <- read_excel(ref_path); best_vals <- setNames(r
 normalize_fixed <- function(x, ind_name) pmin(100, pmax(0, (x - worst_vals[ind_name]) / (best_vals[ind_name] - worst_vals[ind_name]) * 100))
 for (ind in names(df)[-1]) df[[ind]] <- normalize_fixed(df[[ind]], ind)
 
-# Calculate 15 SDG scores (SDG14 is not included in the dataset)
 sdg_ids <- c(1:13, 15, 16)
 score_mat <- sapply(sdg_ids, function(g) rowMeans(df[, grepl(paste0("^G", g, "\\."), names(df)), drop = FALSE], na.rm = TRUE)); colnames(score_mat) <- paste0("SDG", sdg_ids)
 df_scores <- data.frame(city = df$city, score_mat, check.names = FALSE); output_path <- file.path(analysis_dir, "SDG_scores_imputed.xlsx"); write_xlsx(df_scores, output_path)
-
 
 
 
@@ -200,7 +186,6 @@ ggsave(file.path(output_dir, "radar_plot_nation.png"), plot = p_nation, width = 
 GIC_file <- file.path(analysis_dir, "5_governance_capacity_GCI_calculation.xlsx")
 dat <- read_excel(GIC_file)
 
-# Governance indicators
 gov_vars <- c("VOTER_TURNOUT_ratio", "Nonprofit per 10k pop", "AVG_ANNUAL_WAGE",
               "EXP_GDP_RATIO", "establishment entry rate", "Fed Cor Conv per 100k")
 
@@ -240,9 +225,7 @@ df_signed <- df_imputed %>% mutate(across(all_of(indicator_cols), ~ .x * directi
 
 write_xlsx(df_signed, file.path(output_dir, "Indicator_55_signed_imputed.xlsx"))
 
-cat("Signed indicators saved successfully.\n")
-cat("Indicators multiplied by -1:", sum(direction_df$Directions == -1), "\n")
-cat("Indicators multiplied by 1:", sum(direction_df$Directions == 1), "\n")
+
 
 #===========================================================================================
 #--------K-means clustering analysis and Centro values of indicators in each typology--------
@@ -295,13 +278,9 @@ write_xlsx(data_cluster, clustered_file)
 # =============================================================================
 # PCA + 90% cumulative variance + multidimensional envfit
 # =============================================================================
-# -----------------------------------------------------------------------------
-# 1. Paths and data
-# -----------------------------------------------------------------------------
 file_path <- file.path(analysis_dir, "55Indicator_13factor_typology.xlsx")
 df <- read_excel(file_path); names(df) <- trimws(names(df))
 
-# SDG indicators and factors
 sdg_cols <- grep("^G\\d+\\.\\d+$", names(df), value=TRUE)
 id_cols <- c("city", "Typology")
 factor_cols <- setdiff(names(df), c(id_cols, sdg_cols))
@@ -320,9 +299,7 @@ cat("Typology sizes:\n"); print(table(df$Typology))
 if (length(sdg_cols) != 55) warning("Expected 55 SDG indicators, but found ", length(sdg_cols), ".")
 if (length(factor_cols) != 13) warning("Expected 13 factors, but found ", length(factor_cols), ".")
 
-# -----------------------------------------------------------------------------
-# 2. Standardize SDG indicators and perform PCA
-# -----------------------------------------------------------------------------
+
 Xz <- scale(df[, sdg_cols])
 pca <- prcomp(Xz, center=FALSE, scale.=FALSE)
 
@@ -332,17 +309,8 @@ cum_pct <- cumsum(var_pct)
 
 # Number of PCs required to explain >=90% of total variance
 k90 <- which(cum_pct >= 90)[1]
-
-cat(sprintf("\nPC1 explained %.2f%%\n", var_pct[1]))
-cat(sprintf("PC2 explained %.2f%%\n", var_pct[2]))
-cat(sprintf("PC1-2 cumulative = %.2f%%\n", cum_pct[2]))
-cat(sprintf("First %d PCs explain %.2f%% of total variance.\n\n", k90, cum_pct[k90]))
-
 var_tbl <- data.frame(PC=seq_along(var_pct), Variance_percent=var_pct, Cumulative_percent=cum_pct)
 
-# -----------------------------------------------------------------------------
-# 3. Plot PCA variance explained
-# -----------------------------------------------------------------------------
 axis_breaks <- sort(unique(c(1, seq(5, length(var_pct), by=5), k90)))
 
 p_var <- ggplot(var_tbl, aes(x=PC)) +
@@ -360,9 +328,7 @@ p_var <- ggplot(var_tbl, aes(x=PC)) +
 
 ggsave(file.path(analysis_dir, "PCA_explained_variance.png"), p_var, width=10, height=6.5, dpi=400)
 
-# -----------------------------------------------------------------------------
-# 4. PCA coordinates
-# -----------------------------------------------------------------------------
+
 coords <- as.data.frame(pca$x)
 names(coords) <- paste0("PC", seq_len(ncol(coords)))
 
@@ -370,9 +336,7 @@ ord <- coords[, 1:2]
 ord$city <- df$city
 ord$Typology <- df$Typology
 
-# -----------------------------------------------------------------------------
-# 5. envfit using PCs explaining >=90% of total variance
-# -----------------------------------------------------------------------------
+
 factor_df <- as.data.frame(df[, factor_cols])
 
 set.seed(123)
@@ -389,9 +353,7 @@ env_tbl$PC1 <- vec_scores[, 1]
 env_tbl$PC2 <- vec_scores[, 2]
 env_tbl <- env_tbl %>% arrange(P)
 
-# -----------------------------------------------------------------------------
-# 6. Short factor labels
-# -----------------------------------------------------------------------------
+
 short_labels <- c(
   "POP density (pop/km2)"="Pop. Density",
   "GDP per capita (thousands)"="GDP per capita",
@@ -418,9 +380,7 @@ env_tbl$PC2 <- -env_tbl$PC2
 
 vec_sig <- env_tbl %>% filter(P < 0.05)
 
-# -----------------------------------------------------------------------------
-# 7. 2-SD covariance ellipses by Typology
-# -----------------------------------------------------------------------------
+
 TYPOLOGY_PT <- c("Typology1"="#A93226", "Typology2"="#3498DB", "Typology3"="#1F3A5F")
 TYPOLOGY_FILL <- c("Typology1"="#E8B4B0", "Typology2"="#9CC4E0", "Typology3"="#7891B5")
 TYPOLOGY_EDGE <- c("Typology1"="#C0392B", "Typology2"="#5DADE2", "Typology3"="#2C3E7A")
@@ -436,9 +396,7 @@ ellipse_df <- bind_rows(lapply(levels(ord$Typology), function(tp) {
   d <- ord[ord$Typology == tp, ]; ellipse_2sd(d$PC1, d$PC2, tp)
 }))
 
-# -----------------------------------------------------------------------------
-# 8. Scale envfit vectors for PC1-PC2 visualization
-# -----------------------------------------------------------------------------
+
 xr <- diff(range(ord$PC1)); yr <- diff(range(ord$PC2)); arrow_scale <- 0.6 * min(xr, yr)
 
 vec_sig <- vec_sig %>% mutate(
@@ -446,9 +404,7 @@ vec_sig <- vec_sig %>% mutate(
   label_x=xend, label_y=yend, label_hjust=ifelse(xend < 0, 1, 0)
 )
 
-# -----------------------------------------------------------------------------
-# 9. PCA + envfit figure
-# -----------------------------------------------------------------------------
+
 p_env <- ggplot() +
   geom_polygon(data=ellipse_df, aes(PC1, PC2, group=Typology, fill=Typology), alpha=0.1, color=NA) +
   geom_path(data=ellipse_df, aes(PC1, PC2, group=Typology, color=Typology), linewidth=0.9, alpha=0.80) +
@@ -479,9 +435,7 @@ p_env <- ggplot() +
 
 ggsave(file.path(analysis_dir, "PCA_envfit_90pct.png"), p_env, width=14, height=11, dpi=400, bg="white")
 
-# -----------------------------------------------------------------------------
-# 10. Export results to Excel
-# -----------------------------------------------------------------------------
+
 pca_coord_tbl <- cbind(city=df$city, Typology=df$Typology, coords)
 
 write_xlsx(
@@ -492,7 +446,6 @@ write_xlsx(
   ),
   file.path(analysis_dir, "PCA_envfit_90pct_results.xlsx")
 )
-
 
 
 
@@ -570,7 +523,6 @@ sdgs_available <- indicator_to_SDG %>% distinct(SDG) %>% mutate(n = as.numeric(g
 normalize_pairs <- function(df) df %>% mutate(n1 = as.numeric(gsub("SDG", "", Object1)), n2 = as.numeric(gsub("SDG", "", Object2)),
                                               Object1 = paste0("SDG", pmin(n1, n2)), Object2 = paste0("SDG", pmax(n1, n2))) %>% dplyr::select(-n1, -n2)
 
-# Possible indicator pairs are identical for all levels, so calculate them once.
 ind_pair_idx <- t(combn(seq_len(nrow(indicator_to_SDG)), 2))
 possible_pairs <- tibble(Var1 = indicator_to_SDG$Indicator[ind_pair_idx[, 1]], Var2 = indicator_to_SDG$Indicator[ind_pair_idx[, 2]],
                          Object1 = indicator_to_SDG$SDG[ind_pair_idx[, 1]], Object2 = indicator_to_SDG$SDG[ind_pair_idx[, 2]]) %>% normalize_pairs() %>%
