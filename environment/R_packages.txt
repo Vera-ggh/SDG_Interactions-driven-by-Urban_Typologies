@@ -7,7 +7,6 @@ openxlsx
 DMwR2
 Metrics
 ggplot2
-NbClust
 corrplot
 Hmisc
 igraph
